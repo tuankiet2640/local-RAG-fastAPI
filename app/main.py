@@ -1,7 +1,22 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .api.v1.endpoints import chat, conversation, document
+import logging
+import dotenv
 
+# Load environment variables
+dotenv.load_dotenv()
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler("app.log")
+    ]
+)
+logger = logging.getLogger(__name__)
 app = FastAPI(
     title="Local RAG API Service",
     description="A FastAPI service for Retrieval Augmented Generation with chat history",
@@ -18,9 +33,9 @@ app.add_middleware(
 )
 
 # Include routers DRAFTING
-# app.include_router(chat.router, prefix="/api/v1/chat", tags=["chat"])
-# app.include_router(document.router, prefix="/api/v1/documents", tags=["documents"])
-# app.include_router(conversation.router, prefix="/api/v1/conversations", tags=["conversations"])
+app.include_router(chat.router, prefix="/api/v1/chat", tags=["chat"])
+app.include_router(document.router, prefix="/api/v1/documents", tags=["documents"])
+app.include_router(conversation.router, prefix="/api/v1/conversations", tags=["conversations"])
 
 @app.get("/")
 async def root():
