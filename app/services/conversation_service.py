@@ -1,5 +1,6 @@
 from typing import Dict
 from ..models.conversation import Conversation
+from fastapi import HTTPException, status
 
 class ConversationService:
     def __init__(self):
