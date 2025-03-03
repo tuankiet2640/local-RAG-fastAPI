@@ -11,7 +11,9 @@ from ..models.document import Document
 from ..models.chat_message import Message
 from typing import Optional, Dict, Any, List
 from fastapi import HTTPException, status
-
+from ..utils.metadata_utils import extract_metadata
+from ..utils.file_utils import validate_file, save_uploaded_file
+from fastapi import UploadFile
 
 
 
@@ -130,3 +132,40 @@ class RAGService:
         )
         
         return chain
+    async def process_uploaded_files(self, files: List[UploadFile], upload_dir: str):
+        """Process uploaded files and return documents for RAG."""
+        documents = []
+        uploaded_files = []
+        
+        for file in files:
+            try:
+                # Validate file
+                file_extension = validate_file(file)
+                
+                # Save file
+                file_path = await save_uploaded_file(file, upload_dir)
+                
+                # Extract metadata
+                metadata = extract_metadata(file_path, file_extension)
+                
+                # Add to documents list
+                documents.append(Document(file_path=file_path, file_type=file_extension))
+                uploaded_files.append({
+                    "filename": file.filename,
+                    "file_path": file_path,
+                    "metadata": metadata
+                })
+                
+            except Exception as e:
+                logger.error(f"Error processing file {file.filename}: {str(e)}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Error processing file {file.filename}: {str(e)}"
+                )
+            finally:
+                await file.close()
+        
+        return documents, uploaded_files
+
+        
+    
