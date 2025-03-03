@@ -3,6 +3,11 @@ import csv
 from datetime import datetime
 import os
 from typing import Dict, Any
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def extract_metadata(file_path: str, file_type: str) -> Dict[str, Any]:
     """Extract metadata from uploaded files."""
