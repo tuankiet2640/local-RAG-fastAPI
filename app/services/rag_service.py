@@ -65,22 +65,34 @@ class RAGService:
         """Load existing FAISS index if available"""
         if os.path.exists("faiss_index") and self.vector_store is None:
             try:
+                logger.info("Attempting to load FAISS index...")
                 embeddings = OllamaEmbeddings(model=self.embedding_model)
-                self.vector_store = FAISS.load_local("faiss_index", embeddings)
-                logger.info("Loaded existing FAISS index")
+                self.vector_store = FAISS.load_local(
+                    "faiss_index", embeddings, allow_dangerous_deserialization=True
+                )
+                logger.info("Successfully loaded existing FAISS index")
                 return True
             except Exception as e:
                 logger.error(f"Error loading FAISS index: {str(e)}")
                 return False
-        return self.vector_store is not None
+        elif self.vector_store is not None:
+            logger.info("FAISS index already loaded")
+            return True
+        else:
+            logger.error("FAISS index not found or not initialized")
+            return False
 
     def get_rag_chain(self, conversation_id: str, messages: List[Message]):
         """Get RAG chain with conversation memory"""
+        logger.info("Checking if vector store is initialized...")
         if not self.load_existing_index():
+            logger.error("Vector store not initialized. Please upload documents first.")
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Vector store not initialized. Please upload documents first."
             )
+
+        logger.info("Vector store initialized. Creating RAG chain...")
 
         # Create a memory object for this conversation
         memory = ConversationBufferMemory(
@@ -99,13 +111,13 @@ class RAGService:
         # Custom prompt template for better RAG responses
         CUSTOM_PROMPT = """
         You are a helpful assistant that answers questions based on the provided context.
-        
+
         Context: {context}
-        
+
         Chat History: {chat_history}
-        
+
         Human: {question}
-        
+
         Assistant:"""
 
         prompt = PromptTemplate(
@@ -113,14 +125,17 @@ class RAGService:
             template=CUSTOM_PROMPT
         )
 
-        # Create the RAG chain with ollama LLMs
+        # Create the RAG chain with Ollama LLM
+        logger.info(f"Initializing Ollama LLM with model: {self.llm_model}")
         llm = Ollama(model=self.llm_model, temperature=0.7)
 
+        logger.info("Creating retriever from vector store...")
         retriever = self.vector_store.as_retriever(
             search_type="similarity",
             search_kwargs={"k": 5}
         )
 
+        logger.info("Creating ConversationalRetrievalChain...")
         chain = ConversationalRetrievalChain.from_llm(
             llm=llm,
             retriever=retriever,
@@ -129,6 +144,7 @@ class RAGService:
             combine_docs_chain_kwargs={"prompt": prompt}
         )
 
+        logger.info("RAG chain created successfully")
         return chain
 
     async def process_uploaded_files(self, files: List[UploadFile], upload_dir: str):

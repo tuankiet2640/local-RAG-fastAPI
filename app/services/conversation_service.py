@@ -1,24 +1,35 @@
+from datetime import datetime
 from typing import Dict
-from ..models.conversation import Conversation
+from ..models.conversation import Conversation, Message
 from fastapi import HTTPException, status
+
 
 class ConversationService:
     def __init__(self):
         self.conversations: Dict[str, Conversation] = {}
 
-    def get_conversation(self, conversation_id: str):
-        if conversation_id not in self.conversations:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Conversation with ID {conversation_id} not found"
-            )
-        return self.conversations[conversation_id]
+    def create_conversation(self, conversation_id: str, title: str) -> Conversation:
+        """Create a new conversation."""
+        if conversation_id in self.conversations:
+            raise ValueError(f"Conversation with ID {conversation_id} already exists")
 
-    def create_conversation(self, title: str):
-        conversation = Conversation(title=title)
-        self.conversations[conversation.id] = conversation
+        conversation = Conversation(id=conversation_id, title=title)
+        self.conversations[conversation_id] = conversation
         return conversation
 
+    def get_conversation(self, conversation_id: str) -> Conversation:
+        """Get a conversation by ID."""
+        if conversation_id not in self.conversations:
+            raise KeyError(f"Conversation with ID {conversation_id} not found")
+        return self.conversations[conversation_id]
+
+    def add_message(self, conversation_id: str, message: Message):
+        """Add a message to a conversation."""
+        conversation = self.get_conversation(conversation_id)
+        conversation.messages.append(message)
+        conversation.updated_at = datetime.now()
+
     def delete_conversation(self, conversation_id: str):
+        """Delete a conversation by ID."""
         if conversation_id in self.conversations:
             del self.conversations[conversation_id]
