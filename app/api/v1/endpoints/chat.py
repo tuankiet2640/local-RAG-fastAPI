@@ -13,35 +13,41 @@ logger = logging.getLogger(__name__)
 rag_service = RAGService()
 conversation_service = ConversationService()
 
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     """Process a chat message and get a response using RAG"""
-    
     # Create or retrieve conversation
     if request.conversation_id:
         # Existing conversation
-        conversation = conversation_service.get_conversation(request.conversation_id)
-        conversation_id = request.conversation_id
+        try:
+            conversation = conversation_service.get_conversation(request.conversation_id)
+            conversation_id = request.conversation_id
+        except KeyError:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Conversation with ID {request.conversation_id} not found"
+            )
     else:
         # New conversation
         conversation_id = str(uuid.uuid4())
         title = request.new_conversation_title or f"Conversation {len(conversation_service.conversations) + 1}"
         conversation = conversation_service.create_conversation(conversation_id, title)
-    
+
     # Add user message to conversation
     user_message = Message(
         id=str(uuid.uuid4()),
-        role="user", 
+        role="user",
         content=request.message,
         timestamp=datetime.now()
     )
     conversation_service.add_message(conversation_id, user_message)
-    
+
     # Get RAG response
     try:
-        chain = rag_service.get_rag_chain(conversation_id, conversation_service)
+        chain = rag_service.get_rag_chain(conversation_id, conversation.messages)
         result = chain({"question": request.message})
-        
+
         # Extract sources
         sources = []
         if "source_documents" in result:
@@ -51,7 +57,7 @@ async def chat(request: ChatRequest):
                     "metadata": doc.metadata
                 }
                 sources.append(source)
-        
+
         # Create assistant message
         assistant_message = Message(
             id=str(uuid.uuid4()),
@@ -59,16 +65,16 @@ async def chat(request: ChatRequest):
             content=result["answer"],
             timestamp=datetime.now()
         )
-        
+
         # Add to conversation history
         conversation_service.add_message(conversation_id, assistant_message)
-        
+
         return ChatResponse(
             conversation_id=conversation_id,
             message=assistant_message,
             sources=sources
         )
-        
+
     except Exception as e:
         logger.error(f"Error processing chat: {str(e)}")
         raise HTTPException(
