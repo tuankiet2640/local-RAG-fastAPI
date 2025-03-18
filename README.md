@@ -5,14 +5,31 @@ A flexible Retrieval-Augmented Generation (RAG) service that supports multiple L
 ## Features
 
 - Support for multiple LLM providers:
-  - Ollama (default)
+  - Ollama (local models)
   - OpenAI
   - Azure OpenAI
 - Support for multiple embedding providers
 - Document processing for PDF, CSV, and TXT files
 - FAISS vector store for efficient similarity search
 - Conversation memory for chat history
-- Configurable through environment variables
+- Fully configurable through environment variables
+- Centralized configuration management
+- Comprehensive error handling and logging
+- Dependency validation for different providers
+
+## Recent Improvements
+
+- **Enhanced Provider Architecture**: Implemented a flexible provider-based architecture that allows easy switching between Ollama, OpenAI, and Azure OpenAI without code changes.
+  
+- **Centralized Configuration**: All settings are now managed through a central `.env` file with proper validation.
+  
+- **Improved Error Handling**: Added comprehensive error handling with helpful error messages for missing API keys, invalid configurations, and more.
+  
+- **Dependency Management**: Automatic validation of required dependencies based on the selected provider.
+  
+- **Updated LLM Integration**: Updated to the latest LangChain packages, including `langchain-ollama`, `langchain-openai`, and fixed compatibility issues with the newer OpenAI client.
+  
+- **Enhanced Logging**: Added detailed logging throughout the application for better debugging and monitoring.
 
 ## Prerequisites
 
@@ -40,7 +57,10 @@ Create a `.env` file in the root directory with your preferred provider configur
 
 ### For Ollama (default)
 ```env
-RAG_PROVIDER_TYPE=ollama
+# Provider settings
+PROVIDER_TYPE=ollama
+
+# Ollama settings
 OLLAMA_EMBEDDING_MODEL=llama2
 OLLAMA_LLM_MODEL=mistral
 OLLAMA_TEMPERATURE=0.7
@@ -48,7 +68,10 @@ OLLAMA_TEMPERATURE=0.7
 
 ### For OpenAI
 ```env
-RAG_PROVIDER_TYPE=openai
+# Provider settings
+PROVIDER_TYPE=openai
+
+# OpenAI settings
 OPENAI_API_KEY=your-api-key
 OPENAI_EMBEDDING_MODEL=text-embedding-ada-002
 OPENAI_LLM_MODEL=gpt-3.5-turbo
@@ -57,7 +80,10 @@ OPENAI_TEMPERATURE=0.7
 
 ### For Azure OpenAI
 ```env
-RAG_PROVIDER_TYPE=azure_openai
+# Provider settings
+PROVIDER_TYPE=azure_openai
+
+# Azure OpenAI settings
 AZURE_OPENAI_API_KEY=your-api-key
 AZURE_OPENAI_DEPLOYMENT_NAME=your-deployment-name
 AZURE_OPENAI_API_BASE=your-api-base
@@ -76,51 +102,50 @@ uvicorn app.main:app --reload
 
 ### API Endpoints
 
-- `POST /upload`: Upload documents for RAG processing
-- `POST /chat`: Send messages and get responses
-- `GET /health`: Check service health
+- `POST /api/v1/documents/upload`: Upload documents for RAG processing
+- `POST /api/v1/chat`: Send messages and get responses
+- `GET /api/v1/health`: Check service health
 
 ### Example Usage
 
 ```python
 from app.services.rag import create_rag_service
 
-# Create RAG service with default configuration
+# Create RAG service with configuration from .env
 rag_service = create_rag_service()
 
-# Or with custom configuration
-from app.services.rag import RAGConfig, ProviderType
-config = RAGConfig(
-    provider_type=ProviderType.OPENAI,
-    openai_config=OpenAIConfig(
-        api_key="your-api-key",
-        embedding_model="text-embedding-ada-002",
-        llm_model="gpt-3.5-turbo",
-        temperature=0.7
-    )
-)
-rag_service = create_rag_service(config)
+# Access the embeddings and LLMs
+embeddings = rag_service.embedding_provider.get_embeddings()
+llm = rag_service.llm_provider.get_llm()
 ```
 
 ## Project Structure
 
 ```
 app/
-├── models/
+├── config.py                # Centralized configuration 
+├── main.py                  # FastAPI application entry point
+├── models/                  # Data models
 │   ├── document.py
 │   └── chat_message.py
 ├── services/
-│   └── rag/
+│   ├── rag_service.py       # Main RAG service wrapper
+│   └── rag/                 # Provider-based architecture
 │       ├── __init__.py
-│       ├── base.py
-│       ├── config.py
-│       ├── factory.py
-│       ├── service.py
-│       └── providers/
-│           ├── __init__.py
+│       ├── base.py          # Base provider interfaces
+│       ├── factory.py       # Provider factory
+│       ├── service.py       # Core RAG implementation
+│       └── providers/       # Provider implementations
 │           ├── embeddings.py
 │           └── llm.py
-└── main.py
+├── utils/                   # Utility functions
+│   ├── file_utils.py
+│   └── metadata_utils.py
+└── api/                     # API endpoints
+    └── v1/
+        ├── documents.py
+        ├── chat.py
+        └── health.py
 ```
 
 ## Contributing
