@@ -5,8 +5,8 @@ from langchain.memory import ConversationBufferMemory
 from langchain_core.prompts import PromptTemplate
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader, CSVLoader, TextLoader
-from ..models.document import Document
-from ..models.chat_message import Message
+from app.models.document import Document
+from app.models.chat_message import Message
 from fastapi import HTTPException, status
 from .base import BaseEmbeddingProvider, BaseLLMProvider
 import os

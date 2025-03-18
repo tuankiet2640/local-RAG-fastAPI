@@ -1,8 +1,6 @@
 import os
 import logging
 from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import OllamaEmbeddings
-from langchain_community.llms import Ollama
 from langchain.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferMemory
 from langchain_core.prompts import PromptTemplate
@@ -15,15 +13,42 @@ from fastapi import HTTPException, status
 from ..utils.metadata_utils import extract_metadata
 from ..utils.file_utils import validate_file, save_uploaded_file
 from fastapi import UploadFile
+from app.config import get_settings, ProviderType
+import importlib
 
 logger = logging.getLogger(__name__)
 
-
-class RAGService:
+class RAGServiceWrapper:
     def __init__(self):
         self.vector_store = None
-        self.embedding_model = os.getenv("OLLAMA_EMBEDDING_MODEL", "llama2")  # default llama2
-        self.llm_model = os.getenv("OLLAMA_LLM_MODEL", "mistral")  # default mistral
+        self.settings = get_settings()
+        self._rag_service = None
+        self._initialize_rag_service()
+        
+    def _initialize_rag_service(self):
+        """Initialize the RAG service with the configured provider"""
+        try:
+            # Import here to avoid circular imports
+            from app.services.rag import create_rag_service
+            self._rag_service = create_rag_service()
+            logger.info(f"Successfully initialized RAG service with provider: {self.settings.provider_type}")
+        except Exception as e:
+            logger.error(f"Failed to initialize RAG service: {str(e)}")
+            raise
+
+    @property
+    def embeddings(self):
+        """Get the embeddings from the RAG service"""
+        if not self._rag_service:
+            self._initialize_rag_service()
+        return self._rag_service.embedding_provider.get_embeddings()
+
+    @property
+    def llm(self):
+        """Get the LLM from the RAG service"""
+        if not self._rag_service:
+            self._initialize_rag_service()
+        return self._rag_service.llm_provider.get_llm()
 
     def initialize_rag(self, documents: List[Document]):
         """Initialize or update the RAG system with documents"""
@@ -49,7 +74,7 @@ class RAGService:
                 logger.error(f"Error loading document {doc.file_path}: {str(e)}")
                 raise HTTPException(status_code=400, detail=f"Error processing document: {str(e)}")
 
-        embeddings = OllamaEmbeddings(model=self.embedding_model)
+        embeddings = self.embeddings
 
         if self.vector_store is None:
             self.vector_store = FAISS.from_documents(all_docs, embeddings)
@@ -57,18 +82,18 @@ class RAGService:
             self.vector_store.add_documents(all_docs)
 
         # Save the index for future use
-        self.vector_store.save_local("faiss_index")
+        self.vector_store.save_local(self.settings.faiss_index_path)
 
         return {"status": "success", "message": f"Processed {len(documents)} documents"}
 
     def load_existing_index(self):
         """Load existing FAISS index if available"""
-        if os.path.exists("faiss_index") and self.vector_store is None:
+        if os.path.exists(self.settings.faiss_index_path) and self.vector_store is None:
             try:
                 logger.info("Attempting to load FAISS index...")
-                embeddings = OllamaEmbeddings(model=self.embedding_model)
+                embeddings = self.embeddings
                 self.vector_store = FAISS.load_local(
-                    "faiss_index", embeddings, allow_dangerous_deserialization=True
+                    self.settings.faiss_index_path, embeddings, allow_dangerous_deserialization=True
                 )
                 logger.info("Successfully loaded existing FAISS index")
                 return True
@@ -125,9 +150,9 @@ class RAGService:
             template=CUSTOM_PROMPT
         )
 
-        # Create the RAG chain with Ollama LLM
-        logger.info(f"Initializing Ollama LLM with model: {self.llm_model}")
-        llm = Ollama(model=self.llm_model, temperature=0.7)
+        # Create the RAG chain with the configured LLM
+        logger.info(f"Initializing LLM with provider: {self.settings.provider_type}")
+        llm = self.llm
 
         logger.info("Creating retriever from vector store...")
         retriever = self.vector_store.as_retriever(
@@ -181,3 +206,6 @@ class RAGService:
                 await file.close()
 
         return documents, uploaded_files
+
+# Backwards compatibility class name
+RAGService = RAGServiceWrapper
