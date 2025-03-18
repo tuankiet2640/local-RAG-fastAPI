@@ -13,6 +13,7 @@ from ..models.chat_message import Message
 from fastapi import HTTPException, status
 import os
 import logging
+from app.services.rag import create_rag_service, RAGConfig, ProviderType
 
 logger = logging.getLogger(__name__)
 
@@ -220,4 +221,41 @@ class RAGService:
         )
 
         logger.info("RAG chain created successfully")
-        return chain 
+        return chain
+
+# For OpenAI
+config = RAGConfig(
+    provider_type=ProviderType.OPENAI,
+    openai_config=OpenAIConfig(
+        api_key="your-api-key",
+        embedding_model="text-embedding-ada-002",
+        llm_model="gpt-3.5-turbo",
+        temperature=0.7
+    )
+)
+
+# For Azure OpenAI
+config = RAGConfig(
+    provider_type=ProviderType.AZURE_OPENAI,
+    azure_openai_config=AzureOpenAIConfig(
+        api_key="your-azure-key",
+        deployment_name="your-deployment",
+        api_base="your-endpoint",
+        embedding_model="text-embedding-ada-002",
+        llm_model="gpt-35-turbo",
+        temperature=0.7
+    )
+)
+
+# For Ollama
+config = RAGConfig(
+    provider_type=ProviderType.OLLAMA,
+    ollama_config=OllamaConfig(
+        embedding_model="llama2",
+        llm_model="mistral",
+        temperature=0.7
+    )
+)
+
+# Create the service with your config
+rag_service = create_rag_service(config) 

@@ -10,19 +10,17 @@ from .providers.llm import (
     OpenAILLMProvider,
     AzureOpenAILLMProvider
 )
-from .config import RAGConfig, ProviderType
 from .factory import create_providers
 
-def create_rag_service(config: RAGConfig = None) -> RAGService:
-    """Create a RAGService instance with the specified configuration"""
-    if config is None:
-        config = RAGConfig.from_env()
+def create_rag_service() -> RAGService:
+    """Create a RAGService instance with configuration from environment variables"""
     
-    embedding_provider, llm_provider = create_providers(config)
+    embedding_provider, llm_provider, index_path = create_providers()
+    
     return RAGService(
         embedding_provider=embedding_provider,
         llm_provider=llm_provider,
-        index_path=config.index_path
+        index_path=index_path
     )
 
 __all__ = [
@@ -35,7 +33,5 @@ __all__ = [
     'OllamaLLMProvider',
     'OpenAILLMProvider',
     'AzureOpenAILLMProvider',
-    'RAGConfig',
-    'ProviderType',
     'create_rag_service'
 ] 
