@@ -1,23 +1,20 @@
 # API Framework
-fastapi>=0.103.1
+fastapi>=0.101.0
 uvicorn>=0.23.2
-pydantic>=2.3.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
 
 # LangChain and Vector Store
-langchain>=0.0.267
+langchain>=0.0.284
 langchain-community>=0.0.10
-langchain-text-splitters>=0.0.1
 langchain-core>=0.1.0
+langchain-text-splitters>=0.0.1
 faiss-cpu>=1.7.4
-ollama>=0.1.0
 
 # Document Processing
 pypdf>=3.15.1
-python-multipart>=0.0.6
-pandas>=2.0.3
-python-magic>=0.4.27
-filetype>=1.2.0
-aiofiles>=23.2.1
+pandas>=2.0.0
+openai>=1.0.0
 
 # Environment and Utilities
 python-dotenv>=1.0.0
@@ -25,3 +22,8 @@ uuid>=1.30
 
 # Additional Dependencies for Metadata and File Handling
 PyPDF2>=3.0.0
+
+# New dependencies from the code block
+langchain-openai>=0.0.2
+langchain-ollama>=0.0.2
+python-multipart>=0.0.6
