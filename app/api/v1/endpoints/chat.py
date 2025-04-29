@@ -10,7 +10,7 @@ import logging
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-rag_service = RAGService()
+rag_service = RAGService()  # Uses provider factory by default
 conversation_service = ConversationService()
 
 

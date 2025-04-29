@@ -8,7 +8,7 @@ from ....services.rag_service import RAGService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-rag_service = RAGService()
+rag_service = RAGService()  # Uses provider factory by default
 
 @router.post("/documents/upload", status_code=status.HTTP_201_CREATED)
 async def upload_documents(documents: DocumentsUploadRequest):
