@@ -16,6 +16,7 @@ from fastapi import UploadFile
 from app.config import get_settings
 import logging
 from .rag.factory import create_providers
+from ..models.knowledge_base import KnowledgeBase
 
 logger = logging.getLogger(__name__)
 
@@ -68,10 +69,13 @@ class RAGServiceWrapper:
         self.llm_provider = llm_provider
         self.vector_store_manager = VectorStoreManager(index_path)
 
-    def initialize_rag(self, documents: List[Document]):
+    def initialize_rag(self, documents: List[Document], kb: KnowledgeBase = None):
         all_docs = []
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         for doc in documents:
+            # Determine chunking parameters (document > KB > default)
+            chunk_size = doc.chunk_size or (kb.chunk_size if kb and kb.chunk_size else 1000)
+            chunk_overlap = doc.chunk_overlap or (kb.chunk_overlap if kb and kb.chunk_overlap else 200)
+            text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
             try:
                 if doc.file_type == "pdf":
                     loader = PyPDFLoader(doc.file_path)
@@ -87,12 +91,20 @@ class RAGServiceWrapper:
             except Exception as e:
                 logger.error(f"Error loading document {doc.file_path}: {str(e)}")
                 raise HTTPException(status_code=400, detail=f"Error processing document: {str(e)}")
-        embeddings = self.embedding_provider.get_embeddings()
+        # Determine embedding model (document > KB > default)
+        embedding_model = None
+        for doc in documents:
+            if doc.embedding_model:
+                embedding_model = doc.embedding_model
+                break
+        if not embedding_model and kb and kb.embedding_model:
+            embedding_model = kb.embedding_model
+        embeddings = self.embedding_provider.get_embeddings() if not embedding_model else self.embedding_provider.__class__(model_name=embedding_model).get_embeddings()
         self.vector_store_manager.add_documents(all_docs, embeddings)
         return {"status": "success", "message": f"Processed {len(documents)} documents"}
 
-    def get_rag_chain(self, conversation_id: str, messages: List[Message]):
-        embeddings = self.embedding_provider.get_embeddings()
+    def get_rag_chain(self, conversation_id: str, messages: List[Message], kb: KnowledgeBase = None):
+        embeddings = self.embedding_provider.get_embeddings() if not kb or not kb.embedding_model else self.embedding_provider.__class__(model_name=kb.embedding_model).get_embeddings()
         if not self.vector_store_manager.load_existing_index(embeddings):
             logger.error("Vector store not initialized. Please upload documents first.")
             raise HTTPException(
@@ -109,18 +121,19 @@ class RAGServiceWrapper:
                 memory.chat_memory.add_user_message(msg.content)
             elif msg.role == "assistant":
                 memory.chat_memory.add_ai_message(msg.content)
-        CUSTOM_PROMPT = """
+        prompt_template = kb.prompt_template if kb and kb.prompt_template else """
         You are a helpful assistant that answers questions based on the provided context.
         Context: {context}
         Chat History: {chat_history}
         Human: {question}
-        Assistant:"""
+        Assistant:""
         prompt = PromptTemplate(
             input_variables=["context", "chat_history", "question"],
-            template=CUSTOM_PROMPT
+            template=prompt_template
         )
         llm = self.llm_provider.get_llm()
-        retriever = self.vector_store_manager.as_retriever()
+        retriever_params = kb.retriever_params if kb and kb.retriever_params else {"k": 5, "search_type": "similarity"}
+        retriever = self.vector_store_manager.vector_store.as_retriever(**retriever_params)
         chain = ConversationalRetrievalChain.from_llm(
             llm=llm,
             retriever=retriever,

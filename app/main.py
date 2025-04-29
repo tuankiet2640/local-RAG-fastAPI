@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .api.v1.endpoints import chat, conversation, document
+from .api.v1.endpoints.knowledge_base import router as kb_router
 import logging
 import dotenv
 
@@ -36,6 +37,7 @@ app.add_middleware(
 app.include_router(chat.router, prefix="/api/v1/chat", tags=["chat"])
 app.include_router(document.router, prefix="/api/v1/documents", tags=["documents"])
 app.include_router(conversation.router, prefix="/api/v1/conversations", tags=["conversations"])
+app.include_router(kb_router, prefix="/api/v1", tags=["knowledge_bases"])
 
 @app.get("/")
 async def root():

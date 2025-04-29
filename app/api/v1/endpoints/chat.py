@@ -4,6 +4,8 @@ from ....models.chat_request_response import ChatRequest, ChatResponse
 from ....models.chat_message import Message
 from ....services.rag_service import RAGService
 from ....services.conversation_service import ConversationService
+from ....api.v1.endpoints.knowledge_base import knowledge_bases
+from ....models.knowledge_base import KnowledgeBase
 from datetime import datetime
 import uuid
 import logging
@@ -15,11 +17,10 @@ conversation_service = ConversationService()
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
-    """Process a chat message and get a response using RAG"""
+async def chat(request: ChatRequest, kb_id: str = None):
+    """Process a chat message and get a response using RAG, with optional per-KB settings."""
     # Create or retrieve conversation
     if request.conversation_id:
-        # Existing conversation
         try:
             conversation = conversation_service.get_conversation(request.conversation_id)
             conversation_id = request.conversation_id
@@ -29,7 +30,6 @@ async def chat(request: ChatRequest):
                 detail=f"Conversation with ID {request.conversation_id} not found"
             )
     else:
-        # New conversation
         conversation_id = str(uuid.uuid4())
         title = request.new_conversation_title or f"Conversation {len(conversation_service.conversations) + 1}"
         conversation = conversation_service.create_conversation(conversation_id, title)
@@ -43,9 +43,19 @@ async def chat(request: ChatRequest):
     )
     conversation_service.add_message(conversation_id, user_message)
 
+    # Find the KB if kb_id is provided
+    kb: KnowledgeBase = None
+    if kb_id:
+        for kb_obj in knowledge_bases:
+            if kb_obj.id == kb_id:
+                kb = kb_obj
+                break
+        if not kb:
+            raise HTTPException(status_code=404, detail="KnowledgeBase not found")
+
     # Get RAG response
     try:
-        chain = rag_service.get_rag_chain(conversation_id, conversation.messages)
+        chain = rag_service.get_rag_chain(conversation_id, conversation.messages, kb=kb)
         result = chain({"question": request.message})
 
         # Extract sources
