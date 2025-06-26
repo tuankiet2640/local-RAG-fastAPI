@@ -1,6 +1,6 @@
 # Local RAG Service with FastAPI
 
-A flexible Retrieval-Augmented Generation (RAG) service that supports multiple LLM and embedding providers, built with FastAPI.
+A flexible Retrieval-Augmented Generation (RAG) service that supports multiple LLM and embedding providers, built with FastAPI. It is good if you want your app on highest level of security but still wants to implement the genAI RAG chatbot for your business
 
 ## Features
 
